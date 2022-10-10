@@ -1,50 +1,33 @@
-# Prometheus Node Exporter Charm
+# Node Exporter Operator Charm
 
 Prometheus [node exporter](https://github.com/prometheus/node_exporter) for
 machine metrics.
 
 ## Quickstart
 
-Deploy the `prometheus-node-exporter` charm and relate it to the units you want
-to export the metrics:
+Deploy the `node-exporter` charm and relate it to the units you want
+to export the metrics for:
 
 ```bash
-$ juju deploy prometheus-node-exporter
-$ juju relate prometheus-node-exporter foo
+juju deploy node-exporter
 ```
 
-The charm can register it's scrape target with Prometheus via relation to the
-[Prometheus charm](https://charmhub.io/prometheus2):
+## Build/Dev
 
+### Build the Charms
+This project uses [`uv`](https://docs.astral.sh/uv/) in combination with [`just`](https://github.com/casey/just)
+to drive [`charmcraft`](https://canonical-charmcraft.readthedocs-hosted.com/en/stable/) to build the `node-exporter` [charm](https://juju.is/charms-architecture) in [`lxd`](https://canonical.com/lxd) containers.
+
+Once you have `charmcraft`, `lxd`, `just`, and `uv` installed you are ready to build.
+
+Build the charm using the following command.
 ```bash
-$ juju relate prometheus-node-exporter prometheus2
+just pack
 ```
-
-## Developing
-
-We supply a `Makefile` with a target to build the charm:
-
-```bash
-$ make charm
-```
-
-## Testing
-Run `tox -e ALL` to run unit + integration tests and verify linting.
-
-## Contact
-
-**We want to hear from you!**
-
-Email us @ [info@omnivector.solutions](mailto:info@omnivector.solutions)
-
-## Bugs
-
-In the case things aren't working as expected, please
-[file a bug](https://github.com/omnivector-solutions/charm-prometheus-node-exporter/issues).
 
 ## License
 
-The charm is maintained under the MIT license. See `LICENSE` file in this
+The charm is maintained under the Apache v2 license. See `LICENSE` file in this
 directory for full preamble.
 
-Copyright &copy; Omnivector Solutions 2021
+Copyright &copy; 2025 Vantage Compute Corporation
