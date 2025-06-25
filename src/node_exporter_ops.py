@@ -95,7 +95,7 @@ def start() -> None:
         raise NodeExporterOpsError(msg)
 
 
-def _uninstall() -> None:
+def uninstall() -> None:
     """Uninstall node_exporter."""
     logger.debug("## Uninstalling node_exporter")
     try:
@@ -104,10 +104,17 @@ def _uninstall() -> None:
     except subprocess.CalledProcessError:
         logger.error("Error stopping node exporter.")
 
-    NODE_EXPORTER_BIN.unlink()
-    NODE_EXPORTER_SYSTEMD_SERVICE_FILE.unlink()
-    NODE_EXPORTER_SYSCONFIG_FILE.unlink()
-    NODE_EXPORTER_VAR_LIB_DIR.unlink()
+    paths_to_unlink = [
+        NODE_EXPORTER_BIN,
+        NODE_EXPORTER_SYSTEMD_SERVICE_FILE,
+        NODE_EXPORTER_SYSCONFIG_FILE,
+    ]
+    for node_exporter_path in paths_to_unlink:
+        if node_exporter_path.exists():
+            node_exporter_path.unlink()
+
+    if NODE_EXPORTER_VAR_LIB_DIR.exists():
+        shutil.rmtree(NODE_EXPORTER_VAR_LIB_DIR)
 
     try:
         subprocess.call(["userdel", NODE_EXPORTER_USER_NAME])
