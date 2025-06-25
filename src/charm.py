@@ -16,26 +16,17 @@
 """Node Exporter Charm."""
 
 import logging
-import os
-import shlex
-import shutil
-import subprocess
-import tarfile
-from pathlib import Path
-from tempfile import TemporaryDirectory
-from urllib import request
 
+import ops
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
-from ops.charm import CharmBase
-from ops.main import main
-from ops.model import ActiveStatus, MaintenanceStatus
 
+import node_exporter_ops as neo
 from constants import JOBS, NODE_EXPORTER_PORT
 
 logger = logging.getLogger(__name__)
 
 
-class NodeExporterCharm(CharmBase):
+class NodeExporterCharm(ops.CharmBase):
     """Charm the service."""
 
     def __init__(self, *args):
@@ -48,132 +39,29 @@ class NodeExporterCharm(CharmBase):
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.stop, self._on_stop)
 
-    def _on_install(self, event) -> None:
-        logger.debug("## Installing charm")
-        self.unit.status = MaintenanceStatus("Installing node-exporter")
-        _install_node_exporter(self.model.config.get("node-exporter-version"))
+    def _on_install(self, event: ops.InstallEvent) -> None:
+        """Install node_exporter."""
+        self.unit.status = ops.MaintenanceStatus("Installing node-exporter...")
+
+        neo.install(self.model.config.get("node-exporter-version"))
+
+        self.unit.set_workload_version(neo.version())
+
         self.unit.open_port("tcp", NODE_EXPORTER_PORT)
 
-        self.unit.status = ActiveStatus("node-exporter installed")
+        self.unit.status = ops.ActiveStatus("node-exporter installed")
 
-    def _on_start(self, event) -> None:
-        logger.debug("## Starting daemon")
-        subprocess.call(["systemctl", "start", "node_exporter"])
-        self.unit.status = ActiveStatus("node-exporter started")
+    def _on_start(self, event: ops.StartEvent) -> None:
+        """Start node_exporter."""
+        self.unit.status = ops.MaintenanceStatus("Starting node-exporter...")
+        neo.start()
+        self.unit.status = ops.ActiveStatus()
 
-    def _on_stop(self, event) -> None:
-        logger.debug("## Stopping daemon")
-        subprocess.call(["systemctl", "stop", "node_exporter"])
-        subprocess.call(["systemctl", "disable", "node_exporter"])
-        _uninstall_node_exporter()
-
-
-def _install_node_exporter(version: str, arch: str = "amd64") -> None:
-    """Download appropriate files and install node-exporter.
-
-    This function downloads the package, extracts it to /usr/bin/, create
-    node-exporter user and group, and creates the systemd service unit.
-
-    Args:
-        version: a string representing the version to install.
-        arch: the hardware architecture (e.g. amd64, armv7).
-    """
-    logger.debug(f"## Installing node_exporter {version}")
-
-    # Download file
-    url = f"https://github.com/prometheus/node_exporter/releases/download/v{version}/node_exporter-{version}.linux-{arch}.tar.gz"
-    logger.debug(f"## Downloading {url}")
-    output = Path("/tmp/node-exporter.tar.gz")
-    fname, headers = request.urlretrieve(url, output)
-
-    # Extract it
-    tar = tarfile.open(output, "r")
-    with TemporaryDirectory(prefix="omni") as tmp_dir:
-        logger.debug(f"## Extracting {tar} to {tmp_dir}")
-        tar.extractall(path=tmp_dir)
-
-        logger.debug("## Installing node_exporter")
-        source = Path(tmp_dir) / f"node_exporter-{version}.linux-{arch}/node_exporter"
-        shutil.copy2(source, "/usr/bin/node_exporter")
-
-    # clean up
-    output.unlink()
-
-    _create_node_exporter_user_group()
-    _create_systemd_service_unit()
-    _render_sysconfig()
-
-
-def _uninstall_node_exporter() -> None:
-    logger.debug("## Uninstalling node-exporter")
-
-    # remove files and folders
-    Path("/usr/bin/node_exporter").unlink()
-    Path("/etc/systemd/system/node_exporter.service").unlink()
-    Path("/etc/sysconfig/node_exporter").unlink()
-    shutil.rmtree(Path("/var/lib/node_exporter/"))
-
-    # remove user and group
-    user = "node_exporter"
-    group = "node_exporter"
-    subprocess.call(["userdel", user])
-    subprocess.call(["groupdel", group])
-
-
-def _create_node_exporter_user_group() -> None:
-    logger.debug("## Creating node_exporter group")
-    group = "node_exporter"
-    cmd = f"groupadd {group}"
-    subprocess.call(shlex.split(cmd))
-
-    logger.debug("## Creating node_exporter user")
-    user = "node_exporter"
-    cmd = f"useradd --system --no-create-home --gid {group} --shell /usr/sbin/nologin {user}"
-    subprocess.call(shlex.split(cmd))
-
-
-def _create_systemd_service_unit() -> None:
-    logger.debug("## Creating systemd service unit for node_exporter")
-    charm_dir = os.path.dirname(os.path.abspath(__file__))
-    template_dir = Path(charm_dir) / "templates"
-
-    service = "node_exporter.service"
-    shutil.copyfile(template_dir / service, f"/etc/systemd/system/{service}")
-
-    subprocess.call(["systemctl", "daemon-reload"])
-    subprocess.call(["systemctl", "enable", service])
-
-
-def _render_sysconfig() -> None:
-    """Render the sysconfig file.
-
-    `context` should contain the following keys:
-        listen_address: a string specifiyng the address to listen to, e.g. 0.0.0.0:9100
-    """
-    logger.debug("## Writing sysconfig file")
-
-    charm_dir = os.path.dirname(os.path.abspath(__file__))
-    template_file = Path(charm_dir) / "templates" / "node_exporter.tmpl"
-
-    sysconfig = Path("/etc/sysconfig/")
-    if not sysconfig.exists():
-        sysconfig.mkdir()
-
-    varlib = Path("/var/lib/node_exporter")
-    textfile_dir = varlib / "textfile_collector"
-    if not textfile_dir.exists():
-        textfile_dir.mkdir(parents=True)
-    shutil.chown(varlib, user="node_exporter", group="node_exporter")
-    shutil.chown(textfile_dir, user="node_exporter", group="node_exporter")
-
-    template_as_string = template_file.read_text()
-
-    target = sysconfig / "node_exporter"
-    if target.exists():
-        target.unlink()
-
-    target.write_text(template_as_string.format(listen_address=f"0.0.0.0:{NODE_EXPORTER_PORT}"))
+    def _on_stop(self, event: ops.StopEvent) -> None:
+        """Stop, disable, and remove node_exporter."""
+        self.unit.status = ops.MaintenanceStatus("Uninstalling node-exporter...")
+        neo.uninstall()
 
 
 if __name__ == "__main__":
-    main(NodeExporterCharm)
+    ops.main(NodeExporterCharm)

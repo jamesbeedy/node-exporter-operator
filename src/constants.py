@@ -14,7 +14,20 @@
 
 """NodeExporterCharm Constants."""
 
+from pathlib import Path
+
 NODE_EXPORTER_PORT = 9100
 
+NODE_EXPORTER_USER_NAME = "node_exporter"
+NODE_EXPORTER_GROUP_NAME = "node_exporter"
+
+NODE_EXPORTER_SYSTEMD_SERVICE_NAME = "node_exporter"
 
 JOBS = [{"static_configs": [{"targets": [f"*:{NODE_EXPORTER_PORT}"]}]}]
+
+NODE_EXPORTER_BIN = Path("/usr/bin/node_exporter")
+NODE_EXPORTER_SYSTEMD_SERVICE_FILE = Path("/etc/systemd/system/node_exporter.service")
+SYSCONFIG_DIR = Path("/etc/sysconfig")
+NODE_EXPORTER_SYSCONFIG_FILE = SYSCONFIG_DIR / "node_exporter"
+NODE_EXPORTER_VAR_LIB_DIR = Path("/var/lib/node_exporter")
+NODE_EXPORTER_TEXTFILE_DIR = NODE_EXPORTER_VAR_LIB_DIR / "textfile_collector"
