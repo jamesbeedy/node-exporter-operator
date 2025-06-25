@@ -14,25 +14,23 @@
 # limitations under the License.
 
 """Node Exporter Charm."""
+
 import logging
 import os
 import shlex
 import shutil
 import subprocess
 import tarfile
-
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from urllib import request
 
+from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from ops.charm import CharmBase
 from ops.main import main
 from ops.model import ActiveStatus, MaintenanceStatus
 
-from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
-
 from constants import JOBS, NODE_EXPORTER_PORT
-
 
 logger = logging.getLogger(__name__)
 
@@ -50,29 +48,27 @@ class NodeExporterCharm(CharmBase):
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.stop, self._on_stop)
 
-    def _on_install(self, event):
+    def _on_install(self, event) -> None:
         logger.debug("## Installing charm")
         self.unit.status = MaintenanceStatus("Installing node-exporter")
-        _install_node_exporter(
-            self.model.config.get('listen-address'),
-            self.model.config.get("node-exporter-version")
-        )
-        self..unit.open_port("tcp", 9100)
+        _install_node_exporter(self.model.config.get("node-exporter-version"))
+        self.unit.open_port("tcp", NODE_EXPORTER_PORT)
 
         self.unit.status = ActiveStatus("node-exporter installed")
 
-    def _on_start(self, event):
+    def _on_start(self, event) -> None:
         logger.debug("## Starting daemon")
         subprocess.call(["systemctl", "start", "node_exporter"])
         self.unit.status = ActiveStatus("node-exporter started")
 
-    def _on_stop(self, event):
+    def _on_stop(self, event) -> None:
         logger.debug("## Stopping daemon")
         subprocess.call(["systemctl", "stop", "node_exporter"])
         subprocess.call(["systemctl", "disable", "node_exporter"])
         _uninstall_node_exporter()
 
-def _install_node_exporter(listen_address: str, version: str, arch: str = "amd64"):
+
+def _install_node_exporter(version: str, arch: str = "amd64") -> None:
     """Download appropriate files and install node-exporter.
 
     This function downloads the package, extracts it to /usr/bin/, create
@@ -82,7 +78,6 @@ def _install_node_exporter(listen_address: str, version: str, arch: str = "amd64
         version: a string representing the version to install.
         arch: the hardware architecture (e.g. amd64, armv7).
     """
-
     logger.debug(f"## Installing node_exporter {version}")
 
     # Download file
@@ -92,7 +87,7 @@ def _install_node_exporter(listen_address: str, version: str, arch: str = "amd64
     fname, headers = request.urlretrieve(url, output)
 
     # Extract it
-    tar = tarfile.open(output, 'r')
+    tar = tarfile.open(output, "r")
     with TemporaryDirectory(prefix="omni") as tmp_dir:
         logger.debug(f"## Extracting {tar} to {tmp_dir}")
         tar.extractall(path=tmp_dir)
@@ -106,10 +101,10 @@ def _install_node_exporter(listen_address: str, version: str, arch: str = "amd64
 
     _create_node_exporter_user_group()
     _create_systemd_service_unit()
-    _render_sysconfig(listen_address)
+    _render_sysconfig()
 
 
-def _uninstall_node_exporter():
+def _uninstall_node_exporter() -> None:
     logger.debug("## Uninstalling node-exporter")
 
     # remove files and folders
@@ -125,7 +120,7 @@ def _uninstall_node_exporter():
     subprocess.call(["groupdel", group])
 
 
-def _create_node_exporter_user_group():
+def _create_node_exporter_user_group() -> None:
     logger.debug("## Creating node_exporter group")
     group = "node_exporter"
     cmd = f"groupadd {group}"
@@ -137,7 +132,7 @@ def _create_node_exporter_user_group():
     subprocess.call(shlex.split(cmd))
 
 
-def _create_systemd_service_unit():
+def _create_systemd_service_unit() -> None:
     logger.debug("## Creating systemd service unit for node_exporter")
     charm_dir = os.path.dirname(os.path.abspath(__file__))
     template_dir = Path(charm_dir) / "templates"
@@ -149,7 +144,7 @@ def _create_systemd_service_unit():
     subprocess.call(["systemctl", "enable", service])
 
 
-def _render_sysconfig(listen_address: str) -> None:
+def _render_sysconfig() -> None:
     """Render the sysconfig file.
 
     `context` should contain the following keys:
@@ -177,8 +172,7 @@ def _render_sysconfig(listen_address: str) -> None:
     if target.exists():
         target.unlink()
 
-
-    target.write_text(template_as_string.format(listen_address=listen_address))
+    target.write_text(template_as_string.format(listen_address=f"0.0.0.0:{NODE_EXPORTER_PORT}"))
 
 
 if __name__ == "__main__":

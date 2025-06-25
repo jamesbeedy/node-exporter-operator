@@ -21,8 +21,5 @@ async def get_unit_address(ops_test: OpsTest, app_name: str, unit_num: int) -> s
     try:
         address = app["units"][f"{app_name}/{unit_num}"]["public_address"]
     except KeyError:
-        raise RuntimeError(
-            f"unit {app_name}/{unit_num} not found. "
-            f"Try with one of {app['units']}"
-        )
+        raise RuntimeError(f"unit {app_name}/{unit_num} not found. Try with one of {app['units']}")
     return address

@@ -1,4 +1,7 @@
 name: node-exporter
+description: >
+    Export machine metrics to Prometheus.
+
 summary: >
     Export machine metrics to Prometheus.
 
@@ -22,7 +25,6 @@ platforms:
 
 parts:
   charm:
-    influxdb:
     source: .
     plugin: uv
     build-snaps:

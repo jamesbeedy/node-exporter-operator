@@ -1,4 +1,7 @@
 version
+.venv
+venv
+.ruff_cache/
 *charm
 build
 .tox

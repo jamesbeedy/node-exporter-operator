@@ -17,13 +17,4 @@
 NODE_EXPORTER_PORT = 9100
 
 
-JOBS = [
-    {
-        "static_configs": [
-            {
-                "targets": [f"*:{NODE_EXPORTER_PORT}"]
-            }
-        ]
-    }
-]
-
+JOBS = [{"static_configs": [{"targets": [f"*:{NODE_EXPORTER_PORT}"]}]}]
