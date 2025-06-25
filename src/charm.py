@@ -1,8 +1,19 @@
 #!/usr/bin/env python3
-# Copyright 2021 Omnivector Solutions.
-# See LICENSE file for licensing details.
+# Copyright 2025 Vantage Compute Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-"""Prometheus Node Exporter Charm."""
+"""Node Exporter Charm."""
 import logging
 import os
 import shlex
@@ -18,19 +29,10 @@ from ops.charm import CharmBase
 from ops.main import main
 from ops.model import ActiveStatus, MaintenanceStatus
 
-
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 
+from constants import JOBS, NODE_EXPORTER_PORT
 
-JOBS = [
-    {
-        "static_configs": [
-            {
-                "targets": ["*:9100"]
-            }
-        ]
-    }
-]
 
 logger = logging.getLogger(__name__)
 
@@ -45,37 +47,19 @@ class NodeExporterCharm(CharmBase):
 
         # juju core hooks
         self.framework.observe(self.on.install, self._on_install)
-        self.framework.observe(self.on.upgrade_charm, self._on_upgrade_charm)
-        self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.stop, self._on_stop)
 
     def _on_install(self, event):
         logger.debug("## Installing charm")
         self.unit.status = MaintenanceStatus("Installing node-exporter")
-        self._set_charm_version()
         _install_node_exporter(
             self.model.config.get('listen-address'),
             self.model.config.get("node-exporter-version")
         )
+        self..unit.open_port("tcp", 9100)
 
         self.unit.status = ActiveStatus("node-exporter installed")
-
-    def _on_upgrade_charm(self, event):
-        """Perform upgrade operations."""
-        logger.debug("## Upgrading charm")
-        self.unit.status = MaintenanceStatus("Upgrading node-exporter")
-        self._set_charm_version()
-
-        self.unit.status = ActiveStatus("node-exporter upgraded")
-
-    def _on_config_changed(self, event):
-        """Handle configuration updates."""
-        logger.debug("## Configuring charm")
-
-        _render_sysconfig(self.model.config.get("listen-address"))
-        subprocess.call(["systemctl", "restart", "node_exporter"])
-        #self._on_set_scrape_job_info(event)
 
     def _on_start(self, event):
         logger.debug("## Starting daemon")
@@ -87,11 +71,6 @@ class NodeExporterCharm(CharmBase):
         subprocess.call(["systemctl", "stop", "node_exporter"])
         subprocess.call(["systemctl", "disable", "node_exporter"])
         _uninstall_node_exporter()
-
-    def _set_charm_version(self):
-        """Set the application version for Juju Status."""
-        self.unit.set_workload_version(Path("version").read_text().strip())
-
 
 def _install_node_exporter(listen_address: str, version: str, arch: str = "amd64"):
     """Download appropriate files and install node-exporter.
