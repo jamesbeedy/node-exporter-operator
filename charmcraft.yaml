@@ -1,9 +1,10 @@
 name: node-exporter
 description: >
     Export machine metrics to Prometheus.
+    Upstream project: https://github.com/prometheus/node_exporter
 
 summary: >
-    Export machine metrics to Prometheus.
+    This operator provides the `node_exporter` as a subordinate charm.
 
 links:
   contact: https://matrix.to/#/#hpc:ubuntu.com
